@@ -1,0 +1,267 @@
+﻿@model Sudoku_Web.Models.Sudoku.Sudoku
+@{
+    ViewBag.Title = "Sudoku";
+}
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Sudoku</title>
+
+    <script src="~/Scripts/jquery-1.10.2.intellisense.js"></script>
+    <script src="~/Scripts/jquery-1.10.2.js"></script>
+    <script src="~/Scripts/jquery-1.10.2.min.js"></script>
+
+    <script>
+
+        $(document).ready(function(){
+            EnableValueButtons();
+            FocusSelectedCell();
+            CheckDifficulty();
+            AlertOnComplete();
+        });
+
+
+        function AlertOnComplete()
+        {
+            var completed = "@Html.Raw(Model.Completed)";
+            alert(completed);
+            if(completed == "true")
+            {
+                alert("Complete!");
+            }
+        }
+
+        function FocusSelectedCell()
+        {
+            var id = "@Html.Raw(Model.SelectedCell.Id)";
+            var cell = document.getElementById(id);
+            cell.focus();
+        }
+
+        function OnCellInput(cell)
+        {
+            var res = cell.id.split("_");
+            var i = res[0];
+            var j = res[1];
+
+            var val = cell.value;
+            val = val.replace(/[^\d]/, '');
+            val = val.substring(0, 1);
+
+            var possibles = "@Html.Raw(Model.SelectedCell.PossiblesString)";
+            //alert(val);
+            //alert(possibles);
+            //alert(possibles.indexOf(val));
+
+
+            if(possibles.indexOf(val) < 0)
+            {
+                val = '';
+            }
+            cell.value = val;
+
+            if(val)
+            {
+                HighlightCellsByValue(val);
+                $.ajax({
+                    type: 'GET',
+                    url: "@Url.Action("GetCellValue","Sudoku")",
+                    data: { i: i, j: j, val: val },
+                    success: function () { location.reload(true); }
+                });
+            }
+            else
+            {
+                cell.style.color = "red";
+            }
+        }
+
+        function OnCellSelected(cell)
+        {
+            var res = cell.id.split("_");
+            var i = res[0];
+            var j = res[1];
+
+            $.ajax({
+                type: 'GET',
+                url: "@Url.Action("GetSelectedCell","Sudoku")",
+                data: {i: i, j: j},
+                success: function() {}
+            });
+        }
+
+        function HighlightCellsByValue(val)
+        {
+            //alert(val);
+            for (var i = 0; i < 9; i++)
+            {
+                for (var j = 0; j < 9; j++)
+                {
+                    var id = i + '_' + j;
+
+                    var cell = document.getElementById(id);
+
+                    if (cell.nodeValue == val)
+                    {
+                        alert(id);
+                        cell.style.color = "green";
+
+                    }
+                }
+            }
+        }
+
+        function EnableValueButtons()
+        {
+            var possibles = "@Html.Raw(Model.SelectedCell.PossiblesString)";
+            //alert(possibles);
+            for(var i = 0; i < 9; i++)
+            {
+                var id = "btn" + i;
+                var btn = document.getElementById(id);
+                btn.disabled = (possibles.indexOf(i+1) < 0);
+            }
+
+        }
+
+        function OnValueButtonClick(val)
+        {
+            var id = @Model.SelectedCell.Row + "_" + @Model.SelectedCell.Column;
+            //alert(id);
+            //alert(val);
+            var cell = document.getElementById(id);
+            cell.value = val;
+            OnCellInput(cell);
+        }
+
+        function OnNewGameClick()
+        {
+            var difficulty = "";
+            var easy = document.getElementById("RadioEasy");
+            var medium = document.getElementById("RadioMedium");
+            var hard = document.getElementById("RadioHard");
+
+            if(easy.checked)
+            {
+                difficulty = "Easy";
+            }
+            if(medium.checked)
+            {
+                difficulty = "Medium";
+            }
+            if(hard.checked)
+            {
+                difficulty = "Hard";
+            }
+
+            $.ajax({
+                type: 'POST',
+                url: "@Url.Action("PostNewGame","Sudoku")",
+                data: {difficulty: difficulty},
+                success: function() {location.reload(true);}
+            });
+        }
+
+        function CheckDifficulty()
+        {
+            var easy = document.getElementById("RadioEasy");
+            var medium = document.getElementById("RadioMedium");
+            var hard = document.getElementById("RadioHard");
+
+            var difficulty = "@Html.Raw(Model.difficulty)";
+            
+            if(difficulty == "Easy")
+            {
+                easy.checked = true;
+            }
+            else if(difficulty == "Medium")
+            {
+                medium.checked = true;
+            }
+            else if(difficulty == "Hard")
+            {
+                hard.checked = true;
+            }
+        }
+
+        function OnHintClick()
+        {
+            $.ajax({
+                type: 'POST',
+                url: "@Url.Action("PostHint","Sudoku")",
+                success: function() {location.reload(true);}
+        });
+        }
+
+        function OnSolveClick()
+        {
+            $.ajax({
+                type: 'POST',
+                url: "@Url.Action("PostSolve","Sudoku")",
+                success: function() {location.reload(true);}
+            });
+        }
+
+    </script>
+</head>
+<body>
+    <div> 
+        <h1>Sudoku Grid</h1>
+        <div>
+
+            <table class="GameGrid">
+                @for (int i = 0; i < 9; i++)
+                { 
+                    var btnId = "btn" + i;
+                    var btnVal = (i + 1).ToString();
+                    <tr>
+                        @for (int j = 0; j < 9; j++)
+                        {
+                            var val = Model.Cells[i, j].Value;
+                            var id = i.ToString() + "_" + j.ToString();
+
+                            //Empty Cell
+                            if (val == 0)
+                            {
+                                <td class="GameCell">
+                                     <input id="@id" type="number" min="1" max="9" list="" class="GameCellText" onclick="OnCellSelected(this)" onkeyup="OnCellInput(this)" oninput="OnCellInput(this)">
+                                </td>
+                            }
+                            else if (!Model.Cells[i, j].ReadOnly)
+                            {
+                                <td class="GameCell">
+                                     <input id="@id" type="number" value="@val" min="1" max="9" list="" class="GameCellText" onclick="OnCellSelected(this)" onkeyup="OnCellInput(this)" oninput="OnCellInput(this)">
+                                </td>
+                            }
+                            else
+                            {
+                                <td class="GameCell">
+                                    <label id="@id" class="GameCellLabel" onclick="HighlightCellsByValue(@val)">
+                                        @val
+                                    </label>
+                                </td>
+                            }
+                        }
+
+                        <td class="SpaceCell"></td>
+
+                        <td class="ButtonCell">
+                            <input id="@btnId" type="button" value="@btnVal" onclick="OnValueButtonClick(@btnVal)">
+                        </td>
+
+                    </tr>
+                }
+            </table>
+            <input id="BtnNewGame" type="button" value="New Game" onclick="OnNewGameClick()"/>
+            <input id="BtnHint" type="button" value="Hint" onclick="OnHintClick()"/>
+            <input id="BtnSolve" type="button" value="Solve" onclick="OnSolveClick()"/>
+            <input id="RadioEasy" type="radio" name="difficulty"/>Easy
+            <input id="RadioMedium" type="radio" name="difficulty"/>Medium
+            <input id="RadioHard" type="radio" name="difficulty"/>Hard
+        </div>
+    </div>
+</body>
+</html>
